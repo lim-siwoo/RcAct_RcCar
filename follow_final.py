@@ -1,4 +1,5 @@
 from Raspi_MotorHAT import Raspi_MotorHAT
+from sense_hat import SenseHat
 from Raspi_PWM_Servo_Driver import PWM
 import cv2
 import mediapipe as mp
@@ -7,6 +8,12 @@ from picamera2 import Picamera2
 import time
 from enum import Enum
 
+
+# Sense HAT setup
+sense = SenseHat()
+sense.clear()
+mapX = 8
+mapY = 8
 # Motor setup
 mh = Raspi_MotorHAT(addr=0x6f)
 dc_motor = mh.getMotor(2)
@@ -99,17 +106,21 @@ def detect_pose(landmarks):
     if (rightAngle > 70 and rightAngle < 110 and #오른팔 꺾기
         leftAngle > 150 and leftShoulderAngle > 150):
         print("ORDER : FORWARD")
+        sense_led("YELLOW")
         return "FORWARD"
     elif (leftAngle > 70 and leftAngle < 110 and  #왼팔 꺾기
           rightAngle > 150 and rightShoulderAngle > 150):
         print("ORDER : BACKWARD")
+        sense_led("YELLOW")
         return "BACKWARD"
     elif (rightAngle > 80 and rightAngle < 100 and 
           leftAngle > 80 and leftAngle < 100 and 
           leftShoulderAngle > 150 and rightShoulderAngle > 150):
+        sense_led("YELLOW")
         return "STOP"
     elif (rightAngle > 150 and leftAngle > 150 and 
           leftShoulderAngle > 150 and rightShoulderAngle > 150):
+        sense_led("YELLOW")
         return "SPECIAL"
     else:
         return "FOLLOW"
@@ -138,7 +149,23 @@ def pid_control(error, integral, Kp, Ki, Tc):
 def stop_car():
     set_dc_motor(0, "STOP")
     set_servo_position(servo_mid)
+    sense.clear()
     print("No person detected, stopping")
+
+def sense_led(color):
+    sense.clear()
+    if color == "GREEN":
+        for y in range(8):
+            for x in range(8):
+                sense.set_pixel(x, y, 0, 255, 0)
+    elif color == "RED":
+        for y in range(8):
+            for x in range(8):
+                sense.set_pixel(x, y, 255, 0, 0)
+    elif color == "YELLOW":
+        for y in range(8):
+            for x in range(8):
+                sense.set_pixel(x, y, 255, 255, 0)
 
 def main():
     global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z, is_reversing
@@ -185,6 +212,13 @@ def main():
                 # Determine current movement direction (forward/reverse)
                 is_reversing = uZ < 20
 
+                # if is_reversing is True: Sense LED GREEN
+                if is_reversing == False:
+                    sense_led("GREEN")
+                else:
+                    sense_led("RED")
+
+
                 # Execute actions based on pose
                 if pose_action == "TURN_LEFT":
                     set_servo_position(servo_left, is_reversing)
@@ -200,6 +234,15 @@ def main():
                     print("Stopping")
                 elif pose_action == "SPECIAL":
                     print("Special Action")
+                    # Set servo to turn position
+                    set_servo_position(servo_left, is_reversing)
+                    # Set DC motor to move forward
+                    set_dc_motor(dc_motor_speed, "FORWARD")
+                    # Wait for 5 seconds
+                    time.sleep(5)
+                    # Stop the car after 5 seconds
+                    set_dc_motor(0, "STOP")
+                    set_servo_position(servo_mid)
                 elif pose_action == "FORWARD":
                     set_servo_position(servo_mid)
                     set_dc_motor(dc_motor_speed, "FORWARD")

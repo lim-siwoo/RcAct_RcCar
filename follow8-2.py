@@ -128,8 +128,7 @@ def stop_car():
     set_servo_position(servo_mid)
     print("No person detected, stopping")
 def main():
-    global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z
-    global is_reversing
+    global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z, is_reversing
     try:
         while True:
             frame = picam2.capture_array()

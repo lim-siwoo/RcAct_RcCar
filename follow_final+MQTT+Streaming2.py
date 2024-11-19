@@ -94,6 +94,9 @@ previous_error_X = previous_error_Y = previous_error_Z = 0
 integral_max = 1000  # To prevent integral windup
 is_reversing = False
 
+# Frame buffer for streaming
+frame_buffer = None
+
 def send_meesage5sec():
     # sense-hat humid temp
     humidity = sense.get_humidity()
@@ -213,22 +216,20 @@ def sense_led(color):
                 sense.set_pixel(x, y, 100, 100, 0)
 
 def generate_frames():
+    global frame_buffer
     while True:
-        frame = picam2.capture_array()
-        frame = cv2.resize(frame, (sizeX, sizeY))
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame = cv2.flip(frame, -1)  # Flip vertically and horizontally
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        if frame_buffer is not None:
+            ret, buffer = cv2.imencode('.jpg', frame_buffer)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def main():
-    global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z, is_reversing
+    global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z, is_reversing, frame_buffer
 
     try:
         # Start Flask server in a separate thread
@@ -242,6 +243,9 @@ def main():
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.flip(frame, -1)  # Flip vertically and horizontally
 
+            # Update frame buffer for streaming
+            frame_buffer = frame.copy()
+
             results = pose.process(frame)
 
             if results.pose_landmarks:
@@ -252,113 +256,71 @@ def main():
                     landmarks[mp_pose.PoseLandmark.NOSE.value].z * rifZ * 2
                 ]
                 # Draw reference point and nose position with connecting line
-                cv2.circle(frame, (int(rifX), int(rifY-100)), 5, (0, 0, 255), -1)  # Reference point
-                cv2.circle(frame, (int(nose[0]), int(nose[1])), 5, (0, 255, 0), -1)  # Nose position
-                cv2.line(frame, (int(rifX), int(rifY-20)), (int(nose[0]), int(nose[1])), (0, 255, 255), 2)  # Connecting line
+                cv2.circle(frame, (int(rifX), int(rifY)), 5, (0, 255, 0), -1)
+                cv2.circle(frame, (int(nose[0]), int(nose[1])), 5, (0, 0, 255), -1)
 
-                # Calculate errors
-                error_X = -(rifX - nose[0])
-                error_Y = rifY - nose[1]
-                error_Z = rifZ + nose[2]
-                
-                # Calculate control values
-                uX, integral_X = pid_control(error_X, integral_X, Kp_X, Ki_X, Tc)
-                uY, integral_Y = pid_control(error_Y, integral_Y, Kp_Y, Ki_Y, Tc)
-                uZ, integral_Z = pid_control(error_Z, integral_Z, Kp_Z, Ki_Z, Tc)
+                # Calculate error
+                error_X = nose[0] - rifX
+                error_Y = nose[1] - rifY
+                error_Z = nose[2] - rifZ
 
-                print(f"uX: {uX}, uY: {uY}, uZ: {uZ}")
+                # PID control
+                control_X, integral_X = pid_control(error_X, integral_X, Kp_X, Ki_X, Tc)
+                control_Y, integral_Y = pid_control(error_Y, integral_Y, Kp_Y, Ki_Y, Tc)
+                control_Z, integral_Z = pid_control(error_Z, integral_Z, Kp_Z, Ki_Z, Tc)
 
-                # Get pose action
-                pose_action = detect_pose(landmarks)
+                # Update previous error
+                previous_error_X = error_X
+                previous_error_Y = error_Y
+                previous_error_Z = error_Z
 
-                # Determine current movement direction (forward/reverse)
-                is_reversing = uZ < 20
+                # Control servo and DC motor
+                set_servo_position(servo_mid - control_X, is_reversing)
+                if abs(control_Y) > 10:
+                    set_dc_motor(dc_motor_speed, "FORWARD")
+                else:
+                    set_dc_motor(0, "STOP")
 
-                # if is_reversing is True: Sense LED GREEN
-                if is_reversing == False:
+                # Detect pose
+                direction = detect_pose(landmarks)
+                if direction == "STOP":
+                    stop_car()
+                elif direction == "FORWARD":
+                    set_dc_motor(dc_motor_speed, "FORWARD")
+                elif direction == "BACKWARD":
+                    set_dc_motor(dc_motor_speed, "BACKWARD")
+                elif direction == "SPECIAL":
                     sense_led("GREEN")
+                    set_dc_motor(dc_motor_speed, "FORWARD")
                 else:
                     sense_led("RED")
+                    stop_car()
 
-                # Execute actions based on pose
-                if pose_action == "TURN_LEFT":
-                    set_servo_position(servo_left, is_reversing)
-                    set_dc_motor(dc_motor_speed, "FORWARD")
-                    print("Turning Left")
-                elif pose_action == "TURN_RIGHT":
-                    set_servo_position(servo_right, is_reversing)
-                    set_dc_motor(dc_motor_speed, "FORWARD")
-                    print("Turning Right")
-                elif pose_action == "STOP":
-                    set_servo_position(servo_mid)
-                    set_dc_motor(0, "STOP")
-                    print("Stopping")
-                elif pose_action == "SPECIAL":
-                    print("Special Action")
-                    # Set servo to turn position
-                    set_servo_position(servo_left, is_reversing)
-                    # Set DC motor to move forward
-                    set_dc_motor(dc_motor_speed, "FORWARD")
-                    # Wait for 5 seconds
-                    time.sleep(5)
-                    # Stop the car after 5 seconds
-                    set_dc_motor(0, "STOP")
-                    set_servo_position(servo_mid)
-                elif pose_action == "FORWARD":
-                    set_servo_position(servo_mid)
-                    set_dc_motor(dc_motor_speed, "FORWARD")
-                    print("Moving Forward")
-                elif pose_action == "BACKWARD":
-                    set_servo_position(servo_mid)
-                    set_dc_motor(dc_motor_speed, "BACKWARD")
-                    print("Moving Backward")
-                else:  # FOLLOW mode
-                    # Standard following behavior using PID control
-                    if abs(error_X) > 50:  # Turning threshold
-                        if error_X < 0:
-                            set_servo_position(servo_right, is_reversing)
-                        else:
-                            set_servo_position(servo_left, is_reversing)
-                    else:
-                        set_servo_position(servo_mid)
-
-                    if(uZ > 20 and uZ < 50):
-                        set_dc_motor(dc_motor_speed, "STOP")
-                        print("Maintaining Position")
-
-                    if(uZ > 50):
-                        set_dc_motor(dc_motor_speed, "FORWARD")
-                        print("Moving Forward")
-                    
-                    if(uZ < 20):
-                        set_dc_motor(dc_motor_speed, "BACKWARD")
-                        print("Moving Backward")
-            else:
-                # Stop the car if no person is detected
-                stop_car()
-
-            # Draw landmarks
-            mp_drawing.draw_landmarks(
-                frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style()
-            )
-
-            # Add direction indicator
-            direction_text = "REVERSE" if is_reversing else "FORWARD"
-            cv2.putText(frame, f"Direction: {direction_text}", (10, 30), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-            cv2.imshow('RC Car Pose Following', frame)
+            # Draw pose landmarks
+            mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                      landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
+            
+            # Display the resulting frame
+            cv2.imshow('MediaPipe Pose', frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
+    except KeyboardInterrupt:
+        pass
+
     finally:
-        stop_car()
-        picam2.close()
-        # connect End
-        mqttc.loop_stop()
+        picam2.stop()
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
+
+# MQTT client loop
+mqttc.loop_stop()
+mqttc.disconnect()
+
+# Release resources
+picam2.close()
+
+

@@ -350,7 +350,8 @@ def main():
 
             cv2.imshow('RC Car Pose Following', frame)
             
-            # 여기서 streaming
+            # 여기서 streaming frame 전송
+            
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break

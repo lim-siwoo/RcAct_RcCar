@@ -1,5 +1,6 @@
 from Raspi_MotorHAT import Raspi_MotorHAT
 from sense_hat import SenseHat
+from faces import normal, happy, sad
 from Raspi_PWM_Servo_Driver import PWM
 import paho.mqtt.client as mqtt
 import cv2
@@ -15,18 +16,30 @@ from enum import Enum
 broker_address = "70.12.229.60"
 broker_port = 1883
 topic = "iot/RCcar/command"
-topic2 = "iot/RCcar/sensor"
+topic_temp = "iot/RCcar/temp"
+topic_humid = "iot/RCcar/humid"
+topic_status = "iot/RCcar/status"
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, reason_code, properties):
     print(f"Connected with result code {reason_code}")
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    # client.subscribe("$SYS/#")
+    client.subscribe("iot/RCcar/mode")
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
     print(msg.topic+" "+str(msg.payload))
+    if msg.topic == "iot/RCcar/mode":
+        if msg.payload == b"STOP":
+            stop_car()
+        elif msg.payload == b"END":
+            picam2.close()
+            cv2.destroyAllWindows()
+            mqttc.loop_stop()
+            exit()
+        elif msg.payload == b"START":
+            main()
 
 
 mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -45,7 +58,7 @@ sense.clear()
 # Motor setup
 mh = Raspi_MotorHAT(addr=0x6f)
 dc_motor = mh.getMotor(2)
-dc_motor_speed = 100
+dc_motor_speed = 200
 
 # Servo setup
 servo = PWM(0x6f)
@@ -102,9 +115,13 @@ def send_meesage5sec():
     #sense-hat humid temp
     humidity = sense.get_humidity()
     temperature = sense.get_temperature()
+    # 소수 2자리까지만 표시
+    humidity = round(humidity, 2)
+    temperature = round(temperature, 2)
     #mqtt message
-    message = f"humidity: {humidity}, temperature: {temperature}"
-    mqttc.publish(topic2, message)
+    
+    mqttc.publish(topic_humid, humidity)
+    mqttc.publish(topic_temp, temperature)
     timer = threading.Timer(5, send_meesage5sec)
     timer.daemon = True
     timer.start()
@@ -158,6 +175,7 @@ def detect_pose(landmarks):
           leftAngle > 80 and leftAngle < 100 and 
           leftShoulderAngle > 150 and rightShoulderAngle > 150):
         sense_led("YELLOW")
+        picam2.capture_file("image.jpg")
         return "STOP"
     elif (rightAngle > 150 and leftAngle > 150 and 
           leftShoulderAngle > 150 and rightShoulderAngle > 150):
@@ -199,6 +217,7 @@ def pid_control(error, integral, Kp, Ki, Tc):
 def stop_car():
     set_dc_motor(0, "STOP")
     set_servo_position(servo_mid)
+    
     sense.clear()
 
 
@@ -216,6 +235,12 @@ def sense_led(color):
         for y in range(8):
             for x in range(8):
                 sense.set_pixel(x, y, 100, 100, 0)
+    elif color == "HAPPY":
+        sense.set_pixels(happy)
+    elif color == "SAD":
+        sense.set_pixels(sad)
+    elif color == "NORMAL":
+        sense.set_pixels(normal)
 
 def main():
     global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z, is_reversing
@@ -264,9 +289,9 @@ def main():
 
                 # if is_reversing is True: Sense LED GREEN
                 if is_reversing == False:
-                    sense_led("GREEN")
+                    sense_led("HAPPY")
                 else:
-                    sense_led("RED")
+                    sense_led("SAD")
 
 
                 # Execute actions based on pose
@@ -274,22 +299,28 @@ def main():
                     set_servo_position(servo_left, is_reversing)
                     set_dc_motor(dc_motor_speed, "FORWARD")
                     print("Turning Left")
+                    message = "TURNLEFT"
+                    mqttc.publish(topic, message)
                 elif pose_action == "TURN_RIGHT":
                     set_servo_position(servo_right, is_reversing)
                     set_dc_motor(dc_motor_speed, "FORWARD")
                     print("Turning Right")
+                    message = "TURNRIGHT"
+                    mqttc.publish(topic, message)
                 elif pose_action == "STOP":
                     set_servo_position(servo_mid)
                     set_dc_motor(0, "STOP")
                     print("Stopping")
                 elif pose_action == "SPECIAL":
                     print("Special Action")
+                    message = "SPECIAL"
+                    mqttc.publish(topic, message)
                     # Set servo to turn position
                     set_servo_position(servo_left, is_reversing)
-                    # Set DC motor to move forward
+                    # Set DC motor to move forward 
                     set_dc_motor(dc_motor_speed, "FORWARD")
                     # Wait for 5 seconds
-                    time.sleep(5)
+                    time.sleep(6)
                     # Stop the car after 5 seconds
                     set_dc_motor(0, "STOP")
                     set_servo_position(servo_mid)
@@ -306,14 +337,20 @@ def main():
                     if abs(error_X) > 50:  # Turning threshold
                         if error_X < 0:
                             set_servo_position(servo_right, is_reversing)
+                            message = "TURNLEFT"
+                            mqttc.publish(topic, message)
                         else:
                             set_servo_position(servo_left, is_reversing)
+                            message = "TURNRIGHT"
+                            mqttc.publish(topic, message)
                     else:
                         set_servo_position(servo_mid)
+                        
 
                     if(uZ > 20 and uZ < 50):
                         set_dc_motor(dc_motor_speed, "STOP")
                         print("Maintaining Position")
+                        sense_led("NORMAL")
 
                     if(uZ > 50):
                         set_dc_motor(dc_motor_speed, "FORWARD")
@@ -333,8 +370,12 @@ def main():
                     # else:
                     #     set_dc_motor(0, "STOP")
                     #     print("Maintaining Position")
+                    message = "FOLLOW"
+                    mqttc.publish(topic_status, message)
             else:
                 # Stop the car if no person is detected
+                message = "NO PERSON"
+                mqttc.publish(topic_status, message)
                 stop_car()
 
             # Draw landmarks
@@ -349,8 +390,7 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
             cv2.imshow('RC Car Pose Following', frame)
-            
-            # 여기서 streaming frame 전송
+    
             
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -360,6 +400,8 @@ def main():
         stop_car()
         picam2.close()
         # connect End
+        message = "END"
+        mqttc.publish(topic_status, message)
         mqttc.loop_stop()
         cv2.destroyAllWindows()
 

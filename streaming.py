@@ -107,6 +107,7 @@ picam2.start_recording(MJPEGEncoder(), FileOutput(output))
 try:
     address = ('', 8000)
     server = StreamingServer(address, StreamingHandler)
+    print("debug")
     server.serve_forever()
 finally:
     picam2.stop_recording()

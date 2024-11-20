@@ -1,9 +1,5 @@
 from Raspi_MotorHAT import Raspi_MotorHAT
 from sense_hat import SenseHat
-import io
-import logging
-import socketserver
-from http import server
 from Raspi_PWM_Servo_Driver import PWM
 import paho.mqtt.client as mqtt
 import cv2
@@ -11,11 +7,12 @@ import mediapipe as mp
 import numpy as np
 from picamera2 import Picamera2
 import threading
-from threading import Condition
 import time
-from picamera2.encoders import MJPEGEncoder
-from picamera2.outputs import FileOutput
+from flask import Flask, render_template, Response
 from enum import Enum
+
+# Flask app setup
+app = Flask(__name__)
 
 
 # MQTT Broker setup
@@ -44,83 +41,6 @@ mqttc.connect(broker_address, broker_port, 60)
 
 mqttc.loop_start()
 
-PAGE = """\
-<html>
-<head>
-<title>picamera2 MJPEG streaming demo</title>
-</head>
-<body>
-<h1>Picamera2 MJPEG Streaming Demo</h1>
-<img src="stream.mjpg" width="640" height="480" />
-</body>
-</html>
-"""
-
-# Streaming
-class StreamingOutput(io.BufferedIOBase):
-    def __init__(self):
-        self.frame = None
-        self.condition = Condition()
-
-    def write(self, buf):
-        with self.condition:
-            self.frame = buf
-            self.condition.notify_all()
-
-
-class StreamingHandler(server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == '/':
-            self.send_response(301)
-            self.send_header('Location', '/index.html')
-            self.end_headers()
-        elif self.path == '/index.html':
-            content = PAGE.encode('utf-8')
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
-            self.send_header('Content-Length', len(content))
-            self.end_headers()
-            self.wfile.write(content)
-        elif self.path == '/stream.mjpg':
-            self.send_response(200)
-            self.send_header('Age', 0)
-            self.send_header('Cache-Control', 'no-cache, private')
-            self.send_header('Pragma', 'no-cache')
-            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
-            self.end_headers()
-            try:
-                while True:
-                    with output.condition:
-                        output.condition.wait()
-                        frame = output.frame
-                        # 회전 처리
-                        img = np.frombuffer(frame, dtype=np.uint8)
-                        img = cv2.imdecode(img, cv2.IMREAD_COLOR)
-                        img = cv2.resize(img, (640, 480))
-                        img = cv2.flip(img, -1)  # Flip vertically and horizontally
-                        _, buffer = cv2.imencode('.jpg', img)
-                        frame = buffer.tobytes()
-
-                    self.wfile.write(b'--FRAME\r\n')
-                    self.send_header('Content-Type', 'image/jpeg')
-                    self.send_header('Content-Length', len(frame))
-                    self.end_headers()
-                    self.wfile.write(frame)
-                    self.wfile.write(b'\r\n')
-            except Exception as e:
-                logging.warning(
-                    'Removed streaming client %s: %s',
-                    self.client_address, str(e))
-        else:
-            self.send_error(404)
-            self.end_headers()
-
-
-class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
-    allow_reuse_address = True
-    daemon_threads = True
-
-output = StreamingOutput()
 
 
 # Sense HAT setup
@@ -301,18 +221,10 @@ def sense_led(color):
             for x in range(8):
                 sense.set_pixel(x, y, 100, 100, 0)
 
-
-def stream_video():
-    address = ('', 8000)
-    server = StreamingServer(address, StreamingHandler)
-    # server.serve_forever()
-    server.server_activate()
-
-def main():
+def generate_frames():
     global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z, is_reversing
-    stream_video();
-    try:
 
+    try:
         while True:
             frame = picam2.capture_array()
             frame = cv2.resize(frame, (sizeX, sizeY))
@@ -320,10 +232,6 @@ def main():
             # 색상 변환 (BGR -> RGB)로 색상 왜곡 수정
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.flip(frame, -1)  # Flip vertically and horizontally
-
-            # streaming output
-            output.write(frame)
-
 
             results = pose.process(frame)
 
@@ -443,19 +351,29 @@ def main():
             direction_text = "REVERSE" if is_reversing else "FORWARD"
             cv2.putText(frame, f"Direction: {direction_text}", (10, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            # 여기서 streaming frame 전송
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
 
-            cv2.imshow('RC Car Pose Following', frame)
+            yield (b'--frame\r\n'
+                     b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
 
     finally:
         stop_car()
         picam2.close()
         # connect End
         mqttc.loop_stop()
-        stream_thread.join()
         cv2.destroyAllWindows()
 
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
 if __name__ == "__main__":
-    main()
+    app.run(host='0.0.0.0', port=5000, debug=True)

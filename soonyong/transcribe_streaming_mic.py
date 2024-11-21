@@ -7,6 +7,8 @@ from google.cloud import speech
 import pyaudio  # 파이썬에서 오디오 입력 사용
 import queue
 
+from data import update_last_sentence
+
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  
@@ -71,9 +73,12 @@ class MicrophoneStream(object):
             yield b''.join(data) # byte-stream
 
 # response  화면에 출력
-def listen_print_loop(responses):
+def listen_print_loop(responses, stop_event):
     num_chars_printed = 0
     for response in responses:
+        if(stop_event.is_set()):
+            break
+        
         if not response.results:
             continue
 
@@ -98,17 +103,17 @@ def listen_print_loop(responses):
             num_chars_printed = len(transcript)
 
         else:   # 확정된 transcript라면
-            print(transcript + overwrite_chars)
+            # update(transcript + overwrite_chars)
+            update_last_sentence(transcript + overwrite_chars)
 
             # 문장중에 '명령끝'이라는 단어가 있다면 종료한다.
-            if re.search(r'\b(명령 끝)\b', transcript, re.I):
-                print('Exiting..')
-                break
+            # if re.search(r'\b(바이 빅스비)\b', transcript, re.I):
+            #     print('안녕히 계세요!!')
+            #     break
 
             num_chars_printed = 0
 
-
-def listening():
+def listening(stop_event):
     # 한국말 사용
     language_code = 'ko-KR'  # a BCP-47 language tag
 
@@ -130,4 +135,4 @@ def listening():
                     for content in audio_generator) # generator expression. 요청 생성
 
         responses = client.streaming_recognize(streaming_config, requests)  # 요청 전달 & 응답 가져옴
-        listen_print_loop(responses)    # 결과 출력. requests, responses 모두 iterable object
+        listen_print_loop(responses, stop_event)    # 결과 출력. requests, responses 모두 iterable object

@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 
-class soonyong_mqtt:
+class MQTT:
     def __init__(self, address, port):
         # MQTT Broker setup
         self.broker_address = address

@@ -3,13 +3,9 @@ from transcribe_streaming_mic import listening
 from mqtt import MQTT
 # from text_speech import Jarvis
 from data import get_update_flag, get_last_sentence
+from text_speech import tts
 
 if __name__ == '__main__':
-
-    from text_speech import make_mp3, play_mp3
-    make_mp3()
-    play_mp3()    
-    
     stop_event = threading.Event()
     stop_event.clear()
     listening_thread = threading.Thread(target=listening, args=(stop_event,))
@@ -23,7 +19,7 @@ if __name__ == '__main__':
                 last_sentence = get_last_sentence()
                 print(last_sentence)
                 try:
-                    pass
+                    tts(last_sentence)
                     # mqtt_client.publish("soonyong", last_sentence)
                 except:
                     print("MQTT publish failed")

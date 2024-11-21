@@ -9,6 +9,8 @@ import queue
 
 from data import update_last_sentence
 
+import numpy as np
+
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  

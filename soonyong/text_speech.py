@@ -4,11 +4,11 @@ from google.cloud import texttospeech
 #     def __init__(self):
 #         self.client = texttospeech.TextToSpeechClient()
 
-def make_mp3():
+def make_mp3(message):
     client = texttospeech.TextToSpeechClient()
 
     # Set the text input to be synthesized
-    synthesis_input = texttospeech.SynthesisInput(text="안녕하세요 저는 빅스비에요")
+    synthesis_input = texttospeech.SynthesisInput(text=message)
 
     # Build the voice request, select the language code ("en-US") and the ssml
     # voice gender ("neutral")
@@ -42,3 +42,7 @@ def play_mp3():
 
     # 오디오 재생
     playsound(audio_file)
+
+def tts(message):
+    make_mp3(message)
+    play_mp3()

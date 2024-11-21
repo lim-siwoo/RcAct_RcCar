@@ -1,6 +1,7 @@
 import threading
 from transcribe_streaming_mic import listening
 from mqtt import soonyong_mqtt
+from data import get_update_flag, get_last_sentence
 
 if __name__ == '__main__':
     stop_event = threading.Event()
@@ -12,7 +13,14 @@ if __name__ == '__main__':
     mqtt_client.connect()
     try:
         while True:
-            pass
+            if get_update_flag():
+                last_sentence = get_last_sentence()
+                print(last_sentence)
+                try:
+                    mqtt_client.publish("soonyong", last_sentence)
+                except:
+                    print("MQTT publish failed")
+            
     except KeyboardInterrupt:
         print("KeyboardInterrupt")
         stop_event.set()

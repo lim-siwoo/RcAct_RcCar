@@ -29,6 +29,13 @@ class soonyong_mqtt:
     def subscribe(self, topic):
         self.mqttc.subscribe(topic)
         self.sub_topic.append(topic)
+    
+    def unsub(self, topic):
+        if topic in self.sub_topic:
+            self.mqttc.unsubscribe(topic)
+            self.sub_topic.remove(topic)
+        else:
+            print(f"topic {topic} is not subscribed.")
             
     def disconnect(self):
         self.mqttc.loop_stop()

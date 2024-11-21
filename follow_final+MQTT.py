@@ -3,14 +3,22 @@ from sense_hat import SenseHat
 from faces import normal, happy, sad
 from Raspi_PWM_Servo_Driver import PWM
 import paho.mqtt.client as mqtt
+import sys
 import cv2
 import mediapipe as mp
 import numpy as np
 from picamera2 import Picamera2
 import threading
 import time
+from flask import Flask, render_template, Response
 from enum import Enum
+from multiprocessing import Process, Queue
 
+app = Flask(__name__)
+
+#Mode
+mode = "AUTO"
+frame_queue = Queue(maxsize=1)
 
 # MQTT Broker setup
 broker_address = "70.12.229.60"
@@ -30,16 +38,23 @@ def on_connect(client, userdata, flags, reason_code, properties):
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
     print(msg.topic+" "+str(msg.payload))
-    if msg.topic == "iot/RCcar/mode":
+    if msg.topic == "iot/RCcar/power":
         if msg.payload == b"STOP":
             stop_car()
-        elif msg.payload == b"END":
-            picam2.close()
-            cv2.destroyAllWindows()
-            mqttc.loop_stop()
-            exit()
-        elif msg.payload == b"START":
-            main()
+        elif msg.payload == b"off":
+            print("Power off")
+            stop_car()
+            power_off()
+            
+
+def power_off():
+    stop_car()
+    picam2.close()
+    # connect End
+    message = "END"
+    mqttc.publish(topic_status, message)
+    mqttc.loop_stop()
+    cv2.destroyAllWindows()
 
 
 mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -242,11 +257,12 @@ def sense_led(color):
     elif color == "NORMAL":
         sense.set_pixels(normal)
 
-def main():
+def generate_frame():
     global integral_X, integral_Y, integral_Z, previous_error_X, previous_error_Y, previous_error_Z, is_reversing
 
     try:
         while True:
+            # global frame
             frame = picam2.capture_array()
             frame = cv2.resize(frame, (sizeX, sizeY))
             
@@ -389,6 +405,11 @@ def main():
             cv2.putText(frame, f"Direction: {direction_text}", (10, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
+            # 최신 프레임을 Queue에 저장 (오래된 데이터는 버림)
+            if frame_queue.full():
+                frame_queue.get()  # 오래된 데이터 제거
+            frame_queue.put(frame)
+            
             cv2.imshow('RC Car Pose Following', frame)
     
             
@@ -396,14 +417,50 @@ def main():
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
+    except KeyboardInterrupt:
+        power_off()
+        pass
     finally:
-        stop_car()
-        picam2.close()
-        # connect End
-        message = "END"
-        mqttc.publish(topic_status, message)
-        mqttc.loop_stop()
-        cv2.destroyAllWindows()
+        power_off()
+
+def streaming_frame():
+    while True:
+        if not frame_queue.empty():
+            frame = frame_queue.get()  # Queue에서 프레임 가져오기
+            ret, jpeg = cv2.imencode('.jpg', frame)
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
+        time.sleep(0.1)
+
+
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    print("video_feed")
+    return Response(streaming_frame(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def run_flask():
+    print("run_flask")
+    app.run(host='0.0.0.0', port=5000, debug=False)
+
 
 if __name__ == "__main__":
-    main()
+    flask_process = Process(target=run_flask)
+    flask_process.start()
+
+    frame_thread = threading.Thread(target=generate_frame)
+    frame_thread.daemon = True
+    frame_thread.start()
+
+    frame_thread.join()
+
+    flask_process.terminate()  # Flask 종료
+    flask_process.join()
+    print("End")
+    sys.exit(0)
+

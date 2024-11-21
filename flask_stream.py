@@ -33,11 +33,11 @@ def generate_frames():
 
         # JPEG로 인코딩
         _, buffer = cv2.imencode('.jpg', processed_frame)
-        frame = buffer.tobytes()
+        processed_frame = buffer.tobytes()
 
         # 프레임 송출
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + processed_frame + b'\r\n')
         
 
 # 라우트 설정

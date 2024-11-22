@@ -7,7 +7,7 @@ from google.cloud import speech
 import pyaudio  # 파이썬에서 오디오 입력 사용
 import queue
 
-from data import update_last_word
+from data import update_word
 
 client = None
 streaming_config = None
@@ -112,7 +112,12 @@ def listening(stop_event):
                 new_transcript = transcript[len(old_transcript) : ]
                 old_transcript = transcript
                 if new_transcript != "":
-                    update_last_word(new_transcript)
+                    update_word(new_transcript)
+                    
+                # 하지만 final 이면 걍 싹다 업데이트.
+                # 중복 입력 가능성 때문에 일단 보류.
+                # if result.is_final:
+                #     update_sentence(transcript)
 
 def init():
     global client, streaming_config

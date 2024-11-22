@@ -1,16 +1,29 @@
-last_word = ""
-update_flag = False
+import time
 
-def update_last_word(word):
-    global last_word, update_flag
-    update_flag = True
-    last_word = word
+sentence = ""
+timeout = 1
+last_update = 0
 
-def get_update_flag():
-    global update_flag
-    return update_flag
+def update_word(word):
+    global sentence, last_update
+    sentence += (" " + word)
+    last_update = time.time()
+    
+# def update_sentence(new_sentence):
+#     global sentence, last_update
+#     sentence = new_sentence
+#     last_update = time.time()
 
-def get_last_word():
-    global last_word, update_flag
-    update_flag = False
-    return last_word
+def check_update_finish():
+    global last_update, timeout
+    if((time.time() - last_update) > timeout):
+        return True
+    return False
+
+def get_sentence():
+    global sentence
+    if(check_update_finish()):
+        return_sentence = sentence
+        sentence = ""
+        return return_sentence
+    return ""

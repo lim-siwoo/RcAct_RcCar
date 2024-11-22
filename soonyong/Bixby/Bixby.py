@@ -1,6 +1,6 @@
 import threading
 from speech_text import init, listening
-from mqtt import MQTT
+from mqtt.mqtt import MQTT
 # from text_speech import Jarvis
 from data import get_sentence
 from text_speech import tts

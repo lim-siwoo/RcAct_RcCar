@@ -1,4 +1,5 @@
 import paho.mqtt.client as mqtt
+from data import update_report
 
 class MQTT:
     def __init__(self, address, port):
@@ -17,7 +18,12 @@ class MQTT:
     # The callback for when a PUBLISH message is received from the server.
     def on_message(self, client, userdata, msg):
         if msg.topic in self.sub_topic:
-            print(f"{msg.topic} {str(msg.payload)}")
+            try:
+                decoded_message = msg.payload.decode('utf-8')  # UTF-8로 디코딩
+                update_report(decoded_message)
+            except UnicodeDecodeError as e:
+                print(f"Decoding error: {e}")
+                print(f"Raw payload: {msg.payload}")
         
     def connect(self):
         self.mqttc.connect(self.broker_address, self.broker_port, 60)

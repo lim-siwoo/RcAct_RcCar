@@ -129,7 +129,8 @@ def init():
         encoding='LINEAR16', # enums.RecognitionConfig.AudioEncoding.LINEAR16
         sample_rate_hertz=RATE,
         max_alternatives=1, # 가장 가능성 높은 1개 alternative만 받음.
-        language_code=language_code
+        language_code=language_code,
+        speech_contexts=[speech.SpeechContext(phrases=["빅스비", "따라", "돌아", "멈춰", "목록", "리스트", "뭐할수있", "보고", "상태", "요약", "로그"], boost=20)]
         )
     streaming_config = speech.StreamingRecognitionConfig(
         config=config,

@@ -1,9 +1,13 @@
 import threading
 from speech_text import init, listening
-from mqtt.mqtt import MQTT
-from data import get_sentence
+from mqtt import MQTT
+from data import get_sentence, get_report
 from text_speech import tts
 import time
+
+ip = "70.12.229.60"
+pub_topic_name = "iot/bixby/command"
+sub_topic_name = "iot/gpt/report"
 
 def remove_whitespace_and_newlines(input_str):
     return input_str.replace(" ", "").replace("\n", "")
@@ -15,8 +19,9 @@ if __name__ == '__main__':
     listening_thread = threading.Thread(target=listening, args=(stop_event,))
     listening_thread.start()
 
-    mqtt_client = MQTT("127.0.0.1", 1883)
-    # mqtt_client.connect()
+    mqtt_client = MQTT(ip, 1883)
+    mqtt_client.connect()
+    mqtt_client.subscribe(sub_topic_name)
     
     tts("안녕하세요. 저는 빅스비입니다. 무엇을 도와드릴까요?")
     try:
@@ -35,26 +40,36 @@ if __name__ == '__main__':
                 called_flag = True
             
             if((time.time() - called_time) <= called_timeout):
-                if "따라와" in sentence:
+                if "따라" in sentence:
                     tts("네, 따라갈게요.")
                     called_flag = False
-                    mqtt_client.publish("command/", "follow")
+                    mqtt_client.publish(pub_topic_name, "follow")
                 elif "돌아" in sentence:
                     tts("네, 개인기를 보여드릴게요.")
                     called_flag = False
-                    mqtt_client.publish("command/", "turn")
+                    mqtt_client.publish(pub_topic_name, "turn")
                 elif "멈춰" in sentence:
                     tts("네, 멈출게요.")
                     called_flag = False
-                    mqtt_client.publish("command/", "stop")
-                elif "목록" in sentence or "리스트" in sentence or "뭐할수있어" in sentence:
+                    mqtt_client.publish(pub_topic_name, "stop")
+                elif "목록" in sentence or "리스트" in sentence or "뭐할수있" in sentence:
                     tts("제가 할 수 있는 일은 따라와, 돌아, 멈춰 입니다.")
+                    called_flag = False
+                elif "보고" in sentence or "상태" in sentence or "요약" in sentence or "로그" in sentence:
+                    mqtt_client.publish("iot/bixby/report", "report")
+                    tts("로그를 요청했어요.")
+                    tts("지금까지의 로그를 요약해드릴게요.")
+                    report = get_report()
+                    print(report)
+                    if(report == ""):
+                        tts("아직 로그가 없어요.")
+                    else:
+                        tts(str(report))
                     called_flag = False
             elif called_flag:
                 tts("하고픈 일이 있다면 다시 불러주세요.")
                 called_flag = False
-                
-    tts("안녕히 가세요.")
+        tts("안녕히 가세요.")
     except KeyboardInterrupt:
         print("KeyboardInterrupt")
         tts("안녕히 가세요.")

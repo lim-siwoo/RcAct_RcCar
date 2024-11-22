@@ -1,0 +1,37 @@
+# config/settings.py
+# MQTT 설정
+BROKER_ADDRESS = "70.12.229.60"
+BROKER_PORT = 1883
+TOPIC_COMMAND = "iot/RCcar/command"
+TOPIC_TEMP = "iot/RCcar/temp"
+TOPIC_HUMID = "iot/RCcar/humid"
+TOPIC_STATUS = "iot/RCcar/status"
+TOPIC_CPU_TEMP = "iot/RCcar/cpuTemp"
+TOPIC_CPU_USAGE = "iot/RCcar/cpuUsage"
+
+# 카메라 설정
+CAMERA_SIZE_X = 480
+CAMERA_SIZE_Y = 270
+REFERENCE_X = CAMERA_SIZE_X / 2
+REFERENCE_Y = CAMERA_SIZE_Y / 2
+REFERENCE_Z = 400
+
+# 모터 설정
+MOTOR_ADDRESS = 0x6f
+MOTOR_NUMBER = 2
+MOTOR_SPEED = 200
+
+# 서보 설정
+SERVO_MID = 370
+SERVO_LEFT = 470
+SERVO_RIGHT = 270
+
+# PID 제어 상수
+PID_KP_X = 0.1
+PID_KI_X = 0.0
+PID_KP_Y = 0.2
+PID_KI_Y = 0.0
+PID_KP_Z = 0.4
+PID_KI_Z = 0.0
+PID_TC = 0.05
+PID_INTEGRAL_MAX = 1000

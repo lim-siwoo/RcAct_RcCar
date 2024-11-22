@@ -17,6 +17,7 @@ class MQTTHandler:
         print(f"Connected with result code {reason_code}")
         client.subscribe("iot/RCcar/mode")
         client.subscribe("iot/RCcar/power")
+        client.subscribe("iot/bixby/command")
 
     def _on_message(self, client, userdata, msg):
         print(f"{msg.topic} {str(msg.payload)}")

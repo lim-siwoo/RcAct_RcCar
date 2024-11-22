@@ -44,6 +44,7 @@ class RCCarController:
 
     def setup_mqtt_callbacks(self):
         def on_message(client, userdata, msg):
+            print(f"received: {msg.payload} from {msg.topic}")
             if msg.topic == "iot/RCcar/power":
                 if msg.payload in [b"STOP", b"off"]:
                     self.stop_car()
@@ -51,10 +52,25 @@ class RCCarController:
                         self.shutdown()
             
             elif msg.topic == "iot/RCcar/mode":
-                if msg.payload == b"MANUAL":
+                if msg.payload == b"false":
                     self.mode = "MANUAL"
-                elif msg.payload == b"AUTO":
+                elif msg.payload == b"true":
                     self.mode = "AUTO"
+            elif msg.topic == "iot/bixby/command":
+                if msg.payload == b"find":
+                    self.mqtt.publish("iot/bixby/response", "I'm here!")
+                elif msg.payload == b"follow":
+                    self.mqtt.publish("iot/bixby/response", "Following you!")
+                    self.mode = "AUTO"
+                elif msg.payload == b"turn":
+                    self.mqtt.publish("iot/bixby/response", "Turning!")
+                    self.mode = "TURN"
+                    self.execute_special_action(True)
+
+                elif msg.payload == b"stop":
+                    self.mqtt.publish("iot/bixby/response", "Stopping!")
+                    self.mode = "MANUAL"
+                
 
         self.mqtt.client.on_message = on_message
 
@@ -97,7 +113,13 @@ class RCCarController:
 
             # Process pose and control car
             is_reversing = u_z < 20
-            self.process_pose_and_control(landmarks, u_x, u_y, u_z, is_reversing)
+            if self.mode == "AUTO":
+                self.process_pose_and_control(landmarks, u_x, u_y, u_z, is_reversing)
+            elif self.mode == "MANUAL":
+                self.stop_car()
+                self.mqtt.publish(TOPIC_STATUS, "MANUAL")
+            elif self.mode == "TURN":
+                pass
             
             # Update visualization
             self.draw_tracking_visualization(frame, nose_pos, is_reversing)
@@ -143,7 +165,7 @@ class RCCarController:
             self.servo.set_position(SERVO_MID)
 
         # Speed control
-        print(u_z)
+        # print(u_z)
         if u_z > 20 and u_z < 50:
             self.motor.set_speed(0, "STOP")
             self.sense_hat.set_led_color("NORMAL")
@@ -160,6 +182,7 @@ class RCCarController:
         self.motor.set_speed(MOTOR_SPEED, "FORWARD")
         time.sleep(6)
         self.stop_car()
+        self.mode = "AUTO"
 
     def draw_tracking_visualization(self, frame, nose_pos, is_reversing):
         # Draw reference point and nose position

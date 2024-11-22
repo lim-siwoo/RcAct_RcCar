@@ -1,16 +1,16 @@
-last_sentence = ""
+last_word = ""
 update_flag = False
 
-def update_last_sentence(sentence):
-    global last_sentence, update_flag
+def update_last_word(word):
+    global last_word, update_flag
     update_flag = True
-    last_sentence = sentence
+    last_word = word
 
 def get_update_flag():
     global update_flag
     return update_flag
 
-def get_last_sentence():
-    global last_sentence, update_flag
+def get_last_word():
+    global last_word, update_flag
     update_flag = False
-    return last_sentence
+    return last_word

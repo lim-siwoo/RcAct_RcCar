@@ -11,7 +11,7 @@ class MQTT:
         self.sub_topic = []
 
     # The callback for when the client receives a CONN-ACK response from the server.        
-    def on_connect(client, userdata, flags, reason_code, properties):
+    def on_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Connected with result code {reason_code}")
         
     # The callback for when a PUBLISH message is received from the server.

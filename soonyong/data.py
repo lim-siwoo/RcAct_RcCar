@@ -1,7 +1,7 @@
 import time
 
 sentence = ""
-timeout = 1
+timeout = 3
 last_update = 0
 
 def update_word(word):

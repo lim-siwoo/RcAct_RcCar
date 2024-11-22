@@ -9,7 +9,8 @@ import queue
 
 from data import update_last_sentence
 
-import numpy as np
+client = None
+streaming_config = None
 
 # Audio recording parameters
 RATE = 16000
@@ -74,48 +75,47 @@ class MicrophoneStream(object):
 
             yield b''.join(data) # byte-stream
 
-# response  화면에 출력
-def listen_print_loop(responses, stop_event):
-    num_chars_printed = 0
-    for response in responses:
-        if(stop_event.is_set()):
-            break
-        
-        if not response.results:
-            continue
-
-        # The `results` list is consecutive. For streaming, we only care about
-        # the first result being considered, since once it's `is_final`, it
-        # moves on to considering the next utterance.
-        # 최종적인 결과값은 언제나 results[0]에 반영되므로 result[0]만 고려.
-        result = response.results[0]
-        if not result.alternatives:
-            continue
-
-        # 확실성 가장 높은 alternative의 해석
-        transcript = result.alternatives[0].transcript
-
-        # 완성된 문장이 intrim 문장보다 짧다면, 나머지 부분은 ' '으로 overwrite해 가려준다.
-        overwrite_chars = ' ' * (num_chars_printed - len(transcript))   
-
-        if not result.is_final: # 확정된 transcript가 아니라면,
-            sys.stdout.write(transcript + overwrite_chars + '\r')   # '\r'로 줄바꿈은 하지 않고 맨 앞으로 돌아가 이전 문장위에 덧쓰도록 한다.
-            sys.stdout.flush()
-
-            num_chars_printed = len(transcript)
-
-        else:   # 확정된 transcript라면
-            # update(transcript + overwrite_chars)
-            update_last_sentence(transcript + overwrite_chars)
-
-            # 문장중에 '명령끝'이라는 단어가 있다면 종료한다.
-            # if re.search(r'\b(바이 빅스비)\b', transcript, re.I):
-            #     print('안녕히 계세요!!')
-            #     break
-
-            num_chars_printed = 0
 
 def listening(stop_event):
+    global client, streaming_config
+    while(not stop_event.is_set()):
+        with MicrophoneStream(RATE, CHUNK) as stream:   # 사운드 스트림 오브젝트 생성. 
+                                                        # pyaudio가 terminate()되는 것을 보장하기 위해 python
+                                                        # context manager  사용.
+            audio_generator = stream.generator()
+            requests = (speech.StreamingRecognizeRequest(audio_content=content)
+                        for content in audio_generator) # generator expression. 요청 생성
+
+            responses = client.streaming_recognize(streaming_config, requests)  # 요청 전달 & 응답 가져옴
+            
+            old_transcript = ""
+            
+            for response in responses:
+                if(stop_event.is_set()):
+                    break
+                
+                if not response.results:
+                    continue
+
+                # The `results` list is consecutive. For streaming, we only care about
+                # the first result being considered, since once it's `is_final`, it
+                # moves on to considering the next utterance.
+                # 최종적인 결과값은 언제나 results[0]에 반영되므로 result[0]만 고려.
+                result = response.results[0]
+                if not result.alternatives:
+                    continue
+
+                # 확실성 가장 높은 alternative의 해석
+                transcript = result.alternatives[0].transcript
+    
+                # 새로운 부분만 업데이트
+                new_transcript = transcript[len(old_transcript) : ]
+                old_transcript = transcript
+                if new_transcript != "":
+                    update_last_sentence(new_transcript)
+
+def init():
+    global client, streaming_config
     # 한국말 사용
     language_code = 'ko-KR'  # a BCP-47 language tag
 
@@ -124,17 +124,8 @@ def listening(stop_event):
         encoding='LINEAR16', # enums.RecognitionConfig.AudioEncoding.LINEAR16
         sample_rate_hertz=RATE,
         max_alternatives=1, # 가장 가능성 높은 1개 alternative만 받음.
-        language_code=language_code)
+        language_code=language_code
+        )
     streaming_config = speech.StreamingRecognitionConfig(
         config=config,
-        interim_results=True) # 해석완료되지 않은(is_final=false) 중도값도 사용.
-
-    with MicrophoneStream(RATE, CHUNK) as stream:   # 사운드 스트림 오브젝트 생성. 
-                                                    # pyaudio가 terminate()되는 것을 보장하기 위해 python
-                                                    # context manager  사용.
-        audio_generator = stream.generator()
-        requests = (speech.StreamingRecognizeRequest(audio_content=content)
-                    for content in audio_generator) # generator expression. 요청 생성
-
-        responses = client.streaming_recognize(streaming_config, requests)  # 요청 전달 & 응답 가져옴
-        listen_print_loop(responses, stop_event)    # 결과 출력. requests, responses 모두 iterable object
+        interim_results=True) # 중도값 사용 여부

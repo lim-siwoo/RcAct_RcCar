@@ -136,12 +136,8 @@ def listening(stop_event):
                 if new_transcript != "":
                     update_word(new_transcript)
                     
-                # 하지만 final 이면 걍 싹다 업데이트.
-                # 중복 입력 가능성 때문에 일단 보류.
-                # if result.is_final:
-                #     update_sentence(transcript)
-                #     print("final data: ", transcript)
-                #     break
+                if len(transcript) > 100:
+                    break
 
 def init():
     global client, streaming_config

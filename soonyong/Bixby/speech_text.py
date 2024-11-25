@@ -78,10 +78,13 @@ class MicrophoneStream(object):
 
 def listening(stop_event):
     global client, streaming_config
-    while(not stop_event.is_set()):
+    while not stop_event.is_set():
         with MicrophoneStream(RATE, CHUNK) as stream:   # 사운드 스트림 오브젝트 생성. 
                                                         # pyaudio가 terminate()되는 것을 보장하기 위해 python
                                                         # context manager  사용.
+            if(stop_event.is_set()):
+                break
+            
             audio_generator = stream.generator()
             requests = (speech.StreamingRecognizeRequest(audio_content=content)
                         for content in audio_generator) # generator expression. 요청 생성
@@ -92,6 +95,7 @@ def listening(stop_event):
             
             for response in responses:
                 if(stop_event.is_set()):
+                    stream.closed = True
                     break
                 
                 if not response.results:

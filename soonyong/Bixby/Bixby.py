@@ -83,7 +83,7 @@ if __name__ == '__main__':
                     if(report == ""):
                         tts("아직 로그가 없어요.")
                     called_flag = False
-                elif len(sentence) > 3:
+                elif len(sentence) >= 3:
                     mqtt_client.publish(pub_topics["chat"], sentence)
                     tts("말씀하신 내용을 이해중이에요. 잠시만 기다려주세요.")
                     chat = mqtt_client.get_message(sub_topics["chat"])

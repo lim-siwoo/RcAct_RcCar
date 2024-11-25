@@ -53,7 +53,7 @@ if __name__ == '__main__':
             if(sentence != ""):
                 print(sentence)
             
-            if my_name in sentence:
+            if my_name in sentence and not called_flag:
                 tts("네, 부르셨어요?")
                 called_time = time.time()
                 called_flag = True
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                     if(report == ""):
                         tts("아직 로그가 없어요.")
                     called_flag = False
-                elif sentence != "":
+                elif len(sentence) > 3:
                     mqtt_client.publish(pub_topics["chat"], sentence)
                     tts("말씀하신 내용을 이해중이에요. 잠시만 기다려주세요.")
                     chat = mqtt_client.get_message(sub_topics["chat"])

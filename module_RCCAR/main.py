@@ -128,6 +128,9 @@ class RCCarController:
             self.stop_car()
 
         return frame
+    
+    def response_pose_state(self, pose_action):
+        self.mqtt.publish(TOPIC_STATE, pose_action)
 
     def process_pose_and_control(self, landmarks, u_x, u_y, u_z, is_reversing):
         pose_action = self.pose_controller.detect_pose(landmarks)
@@ -147,8 +150,10 @@ class RCCarController:
             self.stop_car()
         elif pose_action == "SPECIAL":
             self.execute_special_action(is_reversing)
-        else:  # FOLLOW mode
+        elif pose_action == "FOLLOW":
             self.follow_mode_control(u_x, u_z, is_reversing)
+
+        self.response_pose_state(pose_action)
 
     def follow_mode_control(self, u_x, u_z, is_reversing):
         # Steering control

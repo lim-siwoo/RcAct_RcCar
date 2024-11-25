@@ -23,40 +23,52 @@ class PoseController:
         return angle
 
     def detect_pose(self, landmarks):
-        leftShoulder = [landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
-                       landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
-        leftElbow = [landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
-        leftWrist = [landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].x,
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].y]
-        
-        rightShoulder = [landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
-                        landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
-        rightElbow = [landmarks[self.mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
-                     landmarks[self.mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
-        rightWrist = [landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
-                     landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
+            leftShoulder = [landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
+                        landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+            leftElbow = [landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
+                        landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
+            leftWrist = [landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].x,
+                        landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+            
+            rightShoulder = [landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                            landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+            rightElbow = [landmarks[self.mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
+                        landmarks[self.mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
+            rightWrist = [landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
+                        landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
 
-        leftAngle = self.calculate_angle(leftShoulder, leftElbow, leftWrist)
-        rightAngle = self.calculate_angle(rightShoulder, rightElbow, rightWrist)
-        leftShoulderAngle = self.calculate_angle(rightShoulder, leftShoulder, leftElbow)
-        rightShoulderAngle = self.calculate_angle(leftShoulder, rightShoulder, rightElbow)
+            # 각도 계산
+            leftAngle = self.calculate_angle(leftShoulder, leftElbow, leftWrist)
+            rightAngle = self.calculate_angle(rightShoulder, rightElbow, rightWrist)
+            leftShoulderAngle = self.calculate_angle(rightShoulder, leftShoulder, leftElbow)
+            rightShoulderAngle = self.calculate_angle(leftShoulder, rightShoulder, rightElbow)
 
-        if (rightAngle > 70 and rightAngle < 110 and
-            leftAngle > 150 and leftShoulderAngle > 150):
-            return "FORWARD"
-        elif (leftAngle > 70 and leftAngle < 110 and
-              rightAngle > 150 and rightShoulderAngle > 150):
-            return "BACKWARD"
-        elif (rightAngle > 80 and rightAngle < 100 and
-              leftAngle > 80 and leftAngle < 100 and
-              leftShoulderAngle > 150 and rightShoulderAngle > 150):
-            return "STOP"
-        elif (rightAngle > 150 and leftAngle > 150 and
-              leftShoulderAngle > 150 and rightShoulderAngle > 150):
-            return "SPECIAL"
-        else:
-            return "FOLLOW"
+            # 손목의 y좌표가 팔꿈치보다 낮은지 확인 (자연스러운 팔 내림 자세)
+            left_arm_down = leftWrist[1] > leftElbow[1]
+            right_arm_down = rightWrist[1] > rightElbow[1]
+
+            # IDLE 상태 감지: 양팔이 자연스럽게 내려져 있고, 팔꿈치가 약간 구부러진 상태
+            if (left_arm_down and right_arm_down and
+                120 < leftAngle < 160 and 120 < rightAngle < 160 and
+                leftShoulderAngle < 60 and rightShoulderAngle < 60):
+                return "IDLE"
+            
+            # 기존의 다른 포즈 감지
+            elif (rightAngle > 70 and rightAngle < 110 and
+                leftAngle > 150 and leftShoulderAngle > 150):
+                return "RIGHT"
+            elif (leftAngle > 70 and leftAngle < 110 and
+                rightAngle > 150 and rightShoulderAngle > 150):
+                return "LEFT"
+            elif (rightAngle > 80 and rightAngle < 100 and
+                leftAngle > 80 and leftAngle < 100 and
+                leftShoulderAngle > 150 and rightShoulderAngle > 150):
+                return "STOP"
+            elif (rightAngle > 150 and leftAngle > 150 and
+                leftShoulderAngle > 150 and rightShoulderAngle > 150):
+                return "SPECIAL"
+            else:
+                return "FOLLOW"
 
     def process_frame(self, frame):
         results = self.pose.process(frame)

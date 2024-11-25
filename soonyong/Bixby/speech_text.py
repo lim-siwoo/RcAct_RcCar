@@ -2,12 +2,13 @@
 
 import re # 정규표현식 모듈
 import sys
+import numpy as np
 
 from google.cloud import speech
 import pyaudio  # 파이썬에서 오디오 입력 사용
 import queue
 
-from data import update_word
+from data import update_word, update_sentence
 
 client = None
 streaming_config = None
@@ -54,6 +55,17 @@ class MicrophoneStream(object):
 
     # 한 라운드의 루프마다 현재 버퍼의 내용을 모아서 byte-stream을 yield함.
     def generator(self):
+        noise_threshold_db = 61  # 데시벨 기준치 (필요에 따라 조정 가능)
+        
+        def calculate_db(chunk):
+            """Calculate decibel level of the audio chunk."""
+            audio_data = np.frombuffer(chunk, dtype=np.int16)  # 16-bit PCM 데이터 변환
+            max_val = np.max(np.abs(audio_data))  # 최대값 계산
+            db = -float('inf')  # 음수 무한대로 초기화
+            if max_val != 0:
+                db = 20 * np.log10(max_val)  # 데시벨로 변환
+            return db
+        
         while not self.closed:
             # Use a blocking get() to ensure there's at least one chunk of
             # data, and stop iteration if the chunk is None, indicating the
@@ -73,8 +85,13 @@ class MicrophoneStream(object):
                 except queue.Empty: # 큐에 더이상 데이터가 없을 때까지
                     break
 
-            yield b''.join(data) # byte-stream
-
+            audio_chunk = b''.join(data)
+            db_level = calculate_db(audio_chunk)
+            if db_level != -float('inf') and not np.isnan(db_level) and db_level > noise_threshold_db:
+                yield audio_chunk
+            # 기존 audio_chunk size 만큼의 빈 데이터를 전달
+            else:
+                yield b'\0' * len(audio_chunk)
 
 def listening(stop_event):
     global client, streaming_config
@@ -111,6 +128,7 @@ def listening(stop_event):
 
                 # 확실성 가장 높은 alternative의 해석
                 transcript = result.alternatives[0].transcript
+                # print("raw data: ", transcript)
     
                 # 새로운 부분만 업데이트
                 new_transcript = transcript[len(old_transcript) : ]
@@ -122,6 +140,8 @@ def listening(stop_event):
                 # 중복 입력 가능성 때문에 일단 보류.
                 # if result.is_final:
                 #     update_sentence(transcript)
+                #     print("final data: ", transcript)
+                #     break
 
 def init():
     global client, streaming_config

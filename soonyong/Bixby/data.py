@@ -15,6 +15,10 @@ def check_update_finish():
         return True
     return False
 
+def update_sentence(new_sentence):
+    global sentence
+    sentence = new_sentence
+
 def get_sentence():
     global sentence
     if(check_update_finish()):

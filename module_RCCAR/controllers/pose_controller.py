@@ -49,16 +49,20 @@ class PoseController:
 
             # IDLE 상태 감지: 양팔이 자연스럽게 내려져 있고, 팔꿈치가 약간 구부러진 상태
             if (left_arm_down and right_arm_down and
-                120 < leftAngle < 160 and 120 < rightAngle < 160 and
-                leftShoulderAngle < 60 and rightShoulderAngle < 60):
+                160 < leftAngle and 160 < rightAngle and
+                80 < leftShoulderAngle < 110 and 80 <rightShoulderAngle < 110):
+                print("IDLE")
                 return "IDLE"
             
             # 기존의 다른 포즈 감지
             elif (rightAngle > 70 and rightAngle < 110 and
                 leftAngle > 150 and leftShoulderAngle > 150):
+                print("RIGHT")
                 return "RIGHT"
             elif (leftAngle > 70 and leftAngle < 110 and
                 rightAngle > 150 and rightShoulderAngle > 150):
+                print("LEFT")
+
                 return "LEFT"
             elif (rightAngle > 80 and rightAngle < 100 and
                 leftAngle > 80 and leftAngle < 100 and
@@ -66,6 +70,7 @@ class PoseController:
                 return "STOP"
             elif (rightAngle > 150 and leftAngle > 150 and
                 leftShoulderAngle > 150 and rightShoulderAngle > 150):
+                print("SPECIAL")
                 return "SPECIAL"
             else:
                 return "FOLLOW"

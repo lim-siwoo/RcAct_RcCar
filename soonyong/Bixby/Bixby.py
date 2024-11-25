@@ -7,14 +7,17 @@ import time
 
 ip = "70.12.229.60"
 port = 1883
+my_name = "빅스비"
 pub_topics = {
     "command" : "iot/bixby/command",
     "report" : "iot/bixby/report",
-    "pose" : "iot/rccar/pose"
+    "pose" : "iot/rccar/pose",
+    "chat" : "iot/bixby/chat"
     }
 sub_topics = {
     "pose" : "iot/rccar/pose",
-    "report" : "iot/gpt/report"
+    "report" : "iot/gpt/report",
+    "chat" : "iot/gpt/chat"
     }
 
 def remove_whitespace_and_newlines(input_str):
@@ -39,7 +42,7 @@ if __name__ == '__main__':
         listening_thread.join()
         exit()
     
-    tts("안녕하세요. 저는 빅스비입니다. 무엇을 도와드릴까요?")
+    tts(f"안녕하세요. 저는 {my_name}입니다. 무엇을 도와드릴까요?")
     try:
         called_time = 0
         called_timeout = 10
@@ -50,12 +53,12 @@ if __name__ == '__main__':
             if(sentence != ""):
                 print(sentence)
             
-            if "빅스비" in sentence:
+            if my_name in sentence:
                 tts("네, 부르셨어요?")
                 called_time = time.time()
                 called_flag = True
             
-            if((time.time() - called_time) <= called_timeout):
+            elif((time.time() - called_time) <= called_timeout):
                 if "따라" in sentence:
                     tts("네, 따라갈게요.")
                     called_flag = False
@@ -79,9 +82,18 @@ if __name__ == '__main__':
                     print(report)
                     if(report == ""):
                         tts("아직 로그가 없어요.")
-                    else:
-                        tts(str(report))
                     called_flag = False
+                elif sentence != "":
+                    mqtt_client.publish(pub_topics["chat"], sentence)
+                    tts("말씀하신 내용을 이해중이에요. 잠시만 기다려주세요.")
+                    chat = mqtt_client.get_message(sub_topics["chat"])
+                    print(str(chat))
+                    if(chat == ""):
+                        tts("죄송해요. 이해하지 못했어요.")
+                    else:
+                        tts(str(chat))
+                    called_flag = False
+                    
             elif called_flag:
                 tts("하고픈 일이 있다면 다시 불러주세요.")
                 called_flag = False

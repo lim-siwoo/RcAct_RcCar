@@ -55,7 +55,7 @@ class MicrophoneStream(object):
 
     # 한 라운드의 루프마다 현재 버퍼의 내용을 모아서 byte-stream을 yield함.
     def generator(self):
-        noise_threshold_db = 61  # 데시벨 기준치 (필요에 따라 조정 가능)
+        noise_threshold_db = 63  # 데시벨 기준치 (필요에 따라 조정 가능)
         
         def calculate_db(chunk):
             """Calculate decibel level of the audio chunk."""
@@ -150,7 +150,7 @@ def init():
         sample_rate_hertz=RATE,
         max_alternatives=1, # 가장 가능성 높은 1개 alternative만 받음.
         language_code=language_code,
-        speech_contexts=[speech.SpeechContext(phrases=["빅스비", "따라", "돌아", "멈춰", "목록", "리스트", "뭐할수있", "보고", "상태", "요약", "로그"], boost=100)]
+        speech_contexts=[speech.SpeechContext(phrases=["셰르파", "따라", "돌아", "멈춰", "목록", "리스트", "뭐할수있", "보고", "상태", "요약", "로그"], boost=100)]
         )
     streaming_config = speech.StreamingRecognitionConfig(
         config=config,

@@ -8,6 +8,7 @@ TOPIC_HUMID = "iot/RCcar/humid"
 TOPIC_STATUS = "iot/RCcar/status"
 TOPIC_CPU_TEMP = "iot/RCcar/cpuTemp"
 TOPIC_CPU_USAGE = "iot/RCcar/cpuUsage"
+TOPIC_STATE = "iot/RCcar/state"
 
 # 카메라 설정
 CAMERA_SIZE_X = 480

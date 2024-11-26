@@ -125,9 +125,14 @@ class RCCarController:
             self.draw_tracking_visualization(frame, nose_pos, is_reversing)
         else:
             self.mqtt.publish(TOPIC_STATUS, "NO PERSON")
+            self.mqtt.publish(TOPIC_STATE, "NO PERSON")
             self.stop_car()
 
         return frame
+    
+    def response_pose_state(self, pose_action):
+        if pose_action != "FOLLOW":
+            self.mqtt.publish(TOPIC_STATE, pose_action)
 
     def process_pose_and_control(self, landmarks, u_x, u_y, u_z, is_reversing):
         pose_action = self.pose_controller.detect_pose(landmarks)
@@ -143,12 +148,16 @@ class RCCarController:
         elif pose_action == "BACKWARD":
             self.servo.set_position(SERVO_MID)
             self.motor.set_speed(MOTOR_SPEED, "BACKWARD")
-        elif pose_action == "STOP":
+        elif pose_action == "STOP" or pose_action == "RIGHT" or pose_action == "LEFT":
             self.stop_car()
         elif pose_action == "SPECIAL":
             self.execute_special_action(is_reversing)
-        else:  # FOLLOW mode
+        elif pose_action == "FOLLOW":
             self.follow_mode_control(u_x, u_z, is_reversing)
+        else:
+            self.follow_mode_control(u_x, u_z, is_reversing)
+
+        self.response_pose_state(pose_action)
 
     def follow_mode_control(self, u_x, u_z, is_reversing):
         # Steering control

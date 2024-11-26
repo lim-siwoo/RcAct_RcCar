@@ -7,7 +7,7 @@ import time
 
 ip = "70.12.229.60"
 port = 1883
-my_name = "셰르파"
+my_name = "아스라다"
 pub_topics = {
     "command" : "iot/bixby/command",
     "report" : "iot/bixby/report",
@@ -53,7 +53,7 @@ if __name__ == '__main__':
             if(sentence != ""):
                 print(sentence)
             
-            if (my_name in sentence or "세르파" in sentence or "새르파" in sentence) and not called_flag:
+            if (my_name in sentence or "아슬하다" in sentence or "아수라다" in sentence) and not called_flag:
                 tts("네, 부르셨어요?")
                 called_time = time.time()
                 called_flag = True

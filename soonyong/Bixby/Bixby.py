@@ -119,8 +119,8 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
         
+    mqtt_client.publish(pub_topics["command"], "stop")
     tts("안녕히 가세요.")
-    mqtt.client.publish(pub_topics["command"], "stop")
     mqtt_client.disconnect()
     stop_event.set()
     listening_thread.join()

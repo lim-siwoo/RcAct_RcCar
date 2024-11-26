@@ -82,6 +82,19 @@ if __name__ == '__main__':
                     print(report)
                     if(report == ""):
                         tts("아직 로그가 없어요.")
+                    else:
+                        tts(f"{str(report)}")
+                    called_flag = False
+                elif "포즈" in sentence or "자세" in sentence:
+                    mqtt_client.publish(pub_topics["pose"], "pose")
+                    tts("한번 들여다볼게요.")
+                    tts("지금 보고있는 사람의 자세를 알려드릴게요.")
+                    pose = mqtt_client.get_message(sub_topics["pose"])
+                    print(pose)
+                    if(pose == ""):
+                        tts("무슨 자세인지 잘 모르겠어요.")
+                    else:
+                        tts(f"{str(pose)} 자세를 하고 계시네요.")
                     called_flag = False
                 elif len(sentence) >= 3:
                     mqtt_client.publish(pub_topics["chat"], sentence)
@@ -90,7 +103,7 @@ if __name__ == '__main__':
                     print(str(chat))
                     if(chat == ""):
                         tts("죄송해요. 이해하지 못했어요.")
-                    else:                                                                                                                                                                               
+                    else:
                         tts(str(chat))
                     called_flag = False
                     

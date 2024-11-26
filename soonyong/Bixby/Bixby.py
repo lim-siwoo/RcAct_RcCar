@@ -7,11 +7,11 @@ import time
 
 ip = "70.12.229.60"
 port = 1883
-my_name = "빅스비"
+my_name = "아스라다"
 pub_topics = {
     "command" : "iot/bixby/command",
     "report" : "iot/bixby/report",
-    "pose" : "iot/rccar/pose",
+    "pose" : "iot/bixby/pose",
     "chat" : "iot/bixby/chat"
     }
 sub_topics = {
@@ -53,7 +53,7 @@ if __name__ == '__main__':
             if(sentence != ""):
                 print(sentence)
             
-            if my_name in sentence and not called_flag:
+            if (my_name in sentence or "아슬하다" in sentence or "아수라다" in sentence) and not called_flag:
                 tts("네, 부르셨어요?")
                 called_time = time.time()
                 called_flag = True
@@ -82,6 +82,19 @@ if __name__ == '__main__':
                     print(report)
                     if(report == ""):
                         tts("아직 로그가 없어요.")
+                    else:
+                        tts(f"{str(report)}")
+                    called_flag = False
+                elif "포즈" in sentence or "자세" in sentence:
+                    mqtt_client.publish(pub_topics["pose"], "pose")
+                    tts("한번 들여다볼게요.")
+                    tts("지금 보고있는 사람의 자세를 알려드릴게요.")
+                    pose = mqtt_client.get_message(sub_topics["pose"])
+                    print(pose)
+                    if(pose == ""):
+                        tts("무슨 자세인지 잘 모르겠어요.")
+                    else:
+                        tts(f"{str(pose)} 자세를 하고 계시네요.")
                     called_flag = False
                 elif len(sentence) >= 3:
                     mqtt_client.publish(pub_topics["chat"], sentence)

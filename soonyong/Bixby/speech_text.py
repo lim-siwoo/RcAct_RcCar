@@ -150,7 +150,7 @@ def init():
         sample_rate_hertz=RATE,
         max_alternatives=1, # 가장 가능성 높은 1개 alternative만 받음.
         language_code=language_code,
-        speech_contexts=[speech.SpeechContext(phrases=["아스라다", "아슬하다", "아수라다", "따라", "돌아", "멈춰", "목록", "리스트", "뭐할수있", "보고", "상태", "요약", "로그", "포즈", "자세"], boost=100)]
+        speech_contexts=[speech.SpeechContext(phrases=["아스라다", "아슬하다", "아수라다", "따라", "돌아", "멈춰", "목록", "리스트", "뭐할수있", "보고", "상태", "요약", "로그", "포즈", "자세", "갈게", "바이", "잘가", "잘있어"], boost=100)]
         )
     streaming_config = speech.StreamingRecognitionConfig(
         config=config,

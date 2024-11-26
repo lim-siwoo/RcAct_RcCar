@@ -88,14 +88,18 @@ if __name__ == '__main__':
                 elif "포즈" in sentence or "자세" in sentence:
                     mqtt_client.publish(pub_topics["pose"], "pose")
                     tts("한번 들여다볼게요.")
-                    tts("지금 보고있는 사람의 자세를 알려드릴게요.")
                     pose = mqtt_client.get_message(sub_topics["pose"])
                     print(pose)
-                    if(pose == ""):
+                    if(pose == "" or pose == "UNKNOWN"):
                         tts("무슨 자세인지 잘 모르겠어요.")
+                    elif pose == "NO PERSON":
+                        tts("사람이 없어요.")
                     else:
+                        tts("지금 보고있는 사람의 자세를 알려드릴게요.")
                         tts(f"{str(pose)} 자세를 하고 계시네요.")
                     called_flag = False
+                elif "갈게" in sentence or "바이" in sentence or "잘가" in sentence or "잘있어" in sentence:
+                    break
                 elif len(sentence) >= 3:
                     mqtt_client.publish(pub_topics["chat"], sentence)
                     tts("말씀하신 내용을 이해중이에요. 잠시만 기다려주세요.")
@@ -116,6 +120,7 @@ if __name__ == '__main__':
         print(e)
         
     tts("안녕히 가세요.")
+    mqtt.client.publish(pub_topics["command"], "stop")
     mqtt_client.disconnect()
     stop_event.set()
     listening_thread.join()
